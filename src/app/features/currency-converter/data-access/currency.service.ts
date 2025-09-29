@@ -1,6 +1,6 @@
 import { computed, Injectable, signal } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { catchError, of, Subject, switchMap, tap } from 'rxjs';
+import { catchError, debounceTime, of, Subject, switchMap, tap } from 'rxjs';
 import { connect } from 'ngxtension/connect';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ActiveSide, ConversionResponse, Currency } from './currency.model';
@@ -105,6 +105,7 @@ export class CurrencyService {
 
     this.convertCurrency$
       .pipe(
+        debounceTime(300),
         switchMap(({from, to, amount}) =>
           this.http
             .get<ConversionResponse>(

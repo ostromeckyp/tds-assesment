@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, model, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, model, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
@@ -64,7 +64,7 @@ export class CurrencyConverterComponent {
       const sourceCurrency = this.sourceCurrency();
       const targetCurrency = this.targetCurrency();
 
-      if(!sourceCurrency || !targetCurrency) return;
+      if (!sourceCurrency || !targetCurrency) return;
 
       this.currencyService.previewConversion(sourceCurrency.short_code, targetCurrency.short_code);
     });
@@ -76,23 +76,27 @@ export class CurrencyConverterComponent {
       const sAmount = this.sourceAmount();
       const tAmount = this.targetAmount();
 
-      if (!sourceCurrency || !targetCurrency) return;
 
-      if (side === 'source' && sAmount > 0) {
-        this.currencyService.convertCurrency(
-          sourceCurrency.short_code,
-          targetCurrency.short_code,
-          sAmount,
-          'source'
-        );
-      } else if (side === 'target' && tAmount && tAmount > 0) {
-        this.currencyService.convertCurrency(
-          targetCurrency.short_code,
-          sourceCurrency.short_code,
-          tAmount,
-          'target'
-        );
-      }
+      untracked(() => {
+        const lastTarget = this.currencyService.lastConversionMeta();
+        if (!sourceCurrency || !targetCurrency) return;
+
+        if (side === 'source' && sAmount > 0 && this.distinct(sAmount, side, lastTarget)) {
+          this.currencyService.convertCurrency(
+            sourceCurrency.short_code,
+            targetCurrency.short_code,
+            sAmount,
+            'source'
+          );
+        } else if (side === 'target' && tAmount && tAmount > 0 && this.distinct(tAmount, side, lastTarget)) {
+          this.currencyService.convertCurrency(
+            targetCurrency.short_code,
+            sourceCurrency.short_code,
+            tAmount,
+            'target'
+          );
+        }
+      });
     });
 
     effect(() => {
@@ -115,4 +119,16 @@ export class CurrencyConverterComponent {
     this.activeSide.set('target');
     this.targetAmount.set(numeric);
   }
+
+  private distinct(amount: number, direction: ActiveSide, last?: {
+    from: string;
+    to: string;
+    amount: number;
+    direction: ActiveSide;
+  }): boolean {
+    const differentValue = amount !== last?.amount;
+    const sameValueDifferentDirection = amount === last?.amount && direction !== last?.direction;
+    return sameValueDifferentDirection || differentValue;
+  }
+
 }
