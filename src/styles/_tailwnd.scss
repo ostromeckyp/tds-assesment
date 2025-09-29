@@ -1,0 +1,39 @@
+@use "tailwindcss";
+@use '@angular/material' as mat;
+
+@mixin theme() {
+  @theme {
+      --font-family: var(--font-family);
+      --color-primary: var(--mat-sys-primary);
+      --color-primary-container: var(--mat-sys-color-primary-container);
+      --color-on-primary: var(--mat-sys-color-on-primary);
+      --color-secondary: var(--mat-sys-secondary);
+      --color-secondary-container: var(--mat-sys-color-secondary-container);
+      --color-on-secondary: var(--mat-sys-color-on-secondary);
+      --color-tertiary: var(--mat-sys-color-tertiary);
+      --color-tertiary-container: var(--mat-sys-color-tertiary-container);
+      --color-on-tertiary: var(--mat-sys-color-on-tertiary);
+  }
+
+  .mdc-notched-outline__notch {
+    border-style: none;
+  }
+
+  .mat-mdc-icon-button {
+    line-height: normal;
+  }
+
+
+  /* Custom Tailwind utilities */
+  @keyframes shimmer {
+    0% {
+      background-position: -200% 0;
+    }
+    100% {
+      background-position: 200% 0;
+    }
+  }
+
+  .animate-shimmer {
+    animation: shimmer 1.5s infinite;
+  }}

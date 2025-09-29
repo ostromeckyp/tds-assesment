@@ -1,0 +1,38 @@
+<div class="flex flex-col">
+  @let sCurr = sourceCurrency();
+  @let tCurr = targetCurrency();
+  @let preview = previewResult();
+  <div>
+    <span> 1 {{ sCurr?.name }} to w przeliczeniu </span>
+    <h3>{{ preview }} {{ tCurr?.name }}</h3>
+  </div>
+  <div class="flex flex-row">
+    <mat-form-field>
+      <input matInput type="number" [ngModel]="sourceAmount()" (ngModelChange)="onSourceAmountInput($event)"/>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-select [(ngModel)]="sourceCurrency">
+        @for (currency of currencies(); track currency) {
+          <mat-option [value]="currency">
+            {{ currency.name }}
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+
+  <div class="flex flex-row">
+    <mat-form-field>
+      <input matInput type="number" [ngModel]="targetAmount()" (ngModelChange)="onTargetAmountInput($event)"/>
+    </mat-form-field>
+    <mat-form-field>
+      <mat-select [(ngModel)]="targetCurrency">
+        @for (currency of currencies(); track currency) {
+          <mat-option [value]="currency">
+            {{ currency.name }}
+          </mat-option>
+        }
+      </mat-select>
+    </mat-form-field>
+  </div>
+</div>

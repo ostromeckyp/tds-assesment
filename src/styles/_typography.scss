@@ -1,0 +1,47 @@
+:root {
+  --font-family: Roboto, sans-serif;
+  --font-family-nunito: Nunito, sans-serif;
+}
+
+html {
+  //Set root font size for rem units
+  font-size: 16px;
+}
+
+body {
+  font: var(--mat-sys-body-medium);
+}
+
+h1 {
+  font: var(--mat-sys-display-large);
+}
+
+h2 {
+  font: var(--mat-sys-display-medium);
+}
+
+h3 {
+  font: var(--mat-sys-display-small);
+}
+
+h4 {
+  font: var(--mat-sys-headline-large);
+}
+
+h5 {
+  font: var(--mat-sys-headline-medium);
+}
+
+h6 {
+  font: var(--mat-sys-headline-small);
+}
+
+.label {
+  font: var(--mat-sys-label-large);
+  color: var(--mat-sys-on-surface-variant);
+}
+
+.hint {
+  font: var(--mat-sys-body-small);
+  color: var(--mat-sys-on-surface-variant);
+}
