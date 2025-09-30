@@ -78,18 +78,18 @@ export class CurrencyConverterComponent {
 
       if (!sourceCurrency || !targetCurrency) return;
 
-      if (side === 'source' && sAmount > 0) {
+      if (side === 'source') {
         this.currencyService.convertCurrency({
           from: sourceCurrency.short_code,
           to: targetCurrency.short_code,
           amount: sAmount,
           direction: 'source'
         });
-      } else if (side === 'target' && tAmount && tAmount > 0) {
+      } else if (side === 'target') {
         this.currencyService.convertCurrency({
           from: targetCurrency.short_code,
           to: sourceCurrency.short_code,
-          amount: tAmount,
+          amount: tAmount ?? 0,
           direction: 'target'
         });
       }
