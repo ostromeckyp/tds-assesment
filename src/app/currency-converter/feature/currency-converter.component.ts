@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, model, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, model, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
@@ -8,8 +8,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
 import { MatSnackBarModule } from '@angular/material/snack-bar';
-import { CurrencyService } from '../data-access/currency.service';
 import { ActiveSide, Currency } from '../data-access/currency.model';
+import { CurrencyConverterService } from './currency-converter.service';
 
 @Component({
   selector: 'app-currency-converter',
@@ -24,23 +24,21 @@ import { ActiveSide, Currency } from '../data-access/currency.model';
     MatCardModule,
     MatSnackBarModule
   ],
+  providers: [CurrencyConverterService],
   templateUrl: './currency-converter.component.html',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CurrencyConverterComponent {
-  protected readonly currencyService = inject(CurrencyService);
+  protected readonly currencyService = inject(CurrencyConverterService);
 
   protected readonly currencies = this.currencyService.currencies;
+  protected readonly previewResult = this.currencyService.previewResult;
 
   protected readonly sourceAmount = signal(1);
   protected readonly targetAmount = signal<number | undefined>(undefined);
-
+  private readonly activeSide = signal<ActiveSide>('source');
   protected readonly sourceCurrency = model<Currency | undefined>(undefined);
   protected readonly targetCurrency = model<Currency | undefined>(undefined);
-
-  protected readonly previewResult = this.currencyService.previewResult;
-
-  private readonly activeSide = signal<ActiveSide>('source');
 
   constructor() {
     this.currencyService.loadCurrencies();
@@ -50,6 +48,8 @@ export class CurrencyConverterComponent {
       if (!list.length) {
         return;
       }
+
+      // default to USD -> EUR for demo purposes
       const sourceCurr = list.find(c => c.short_code === 'USD');
       const targetCurr = list.find(c => c.short_code === 'EUR');
 
@@ -76,27 +76,23 @@ export class CurrencyConverterComponent {
       const sAmount = this.sourceAmount();
       const tAmount = this.targetAmount();
 
+      if (!sourceCurrency || !targetCurrency) return;
 
-      untracked(() => {
-        const lastTarget = this.currencyService.lastConversionMeta();
-        if (!sourceCurrency || !targetCurrency) return;
-
-        if (side === 'source' && sAmount > 0 && this.distinct(sAmount, side, lastTarget)) {
-          this.currencyService.convertCurrency(
-            sourceCurrency.short_code,
-            targetCurrency.short_code,
-            sAmount,
-            'source'
-          );
-        } else if (side === 'target' && tAmount && tAmount > 0 && this.distinct(tAmount, side, lastTarget)) {
-          this.currencyService.convertCurrency(
-            targetCurrency.short_code,
-            sourceCurrency.short_code,
-            tAmount,
-            'target'
-          );
-        }
-      });
+      if (side === 'source' && sAmount > 0) {
+        this.currencyService.convertCurrency({
+          from: sourceCurrency.short_code,
+          to: targetCurrency.short_code,
+          amount: sAmount,
+          direction: 'source'
+        });
+      } else if (side === 'target' && tAmount && tAmount > 0) {
+        this.currencyService.convertCurrency({
+          from: targetCurrency.short_code,
+          to: sourceCurrency.short_code,
+          amount: tAmount,
+          direction: 'target'
+        });
+      }
     });
 
     effect(() => {
@@ -119,16 +115,4 @@ export class CurrencyConverterComponent {
     this.activeSide.set('target');
     this.targetAmount.set(numeric);
   }
-
-  private distinct(amount: number, direction: ActiveSide, last?: {
-    from: string;
-    to: string;
-    amount: number;
-    direction: ActiveSide;
-  }): boolean {
-    const differentValue = amount !== last?.amount;
-    const sameValueDifferentDirection = amount === last?.amount && direction !== last?.direction;
-    return sameValueDifferentDirection || differentValue;
-  }
-
 }

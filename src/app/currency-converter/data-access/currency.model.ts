@@ -38,3 +38,12 @@ export interface ConversionResponse {
 }
 
 export type ActiveSide = 'source' | 'target';
+
+export type ConversionPayload = {
+  from: string;
+  to: string;
+  amount: number;
+};
+
+
+export type Conversion = ConversionPayload & { direction: ActiveSide };

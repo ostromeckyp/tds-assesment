@@ -1,9 +1,9 @@
-import { computed, Injectable, signal } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
-import { catchError, debounceTime, of, Subject, switchMap, tap } from 'rxjs';
+import { computed, inject, Injectable, signal } from '@angular/core';
+import { catchError, debounceTime, filter, of, Subject, switchMap, tap } from 'rxjs';
 import { connect } from 'ngxtension/connect';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { ActiveSide, ConversionResponse, Currency } from './currency.model';
+import { CurrencyService } from '../data-access/currency.service';
+import { Conversion, ConversionResponse, Currency } from '../data-access/currency.model';
 
 interface CurrencyState {
   currencies: Currency[];
@@ -11,22 +11,12 @@ interface CurrencyState {
   error: string | undefined;
   conversionResult: number | undefined;
   previewResult: number | undefined;
-  lastConversion:
-    | {
-    from: string;
-    to: string;
-    amount: number;
-    direction: ActiveSide;
-  }
-    | undefined;
+  lastConversion: Conversion | undefined;
 }
 
-@Injectable({
-  providedIn: 'root'
-})
-export class CurrencyService {
-  private readonly API_KEY = 'bj8MCmjkq65UPYQIoTa8IxkgQTWf3NmK';
-  private readonly BASE_URL = 'https://api.currencybeacon.com/v1';
+@Injectable()
+export class CurrencyConverterService {
+  private readonly currencyService = inject(CurrencyService);
 
   // state
   private readonly state = signal<CurrencyState>({
@@ -58,23 +48,18 @@ export class CurrencyService {
   private previewCurrencySuccess$ = new Subject<{ result: number }>();
   private previewCurrencyError$ = new Subject<string>();
 
-  private readonly convertCurrency$ = new Subject<{
-    from: string;
-    to: string;
-    amount: number;
-    direction: ActiveSide;
-  }>();
+  private readonly convertCurrency$ = new Subject<Conversion>();
   private readonly convertSuccess$ = new Subject<{
     result: number;
+    lastConversion: Conversion;
   }>();
   private readonly convertError$ = new Subject<string>();
 
-  constructor(private readonly http: HttpClient) {
-
+  constructor() {
     // side effects
     this.previewCurrency$.pipe(
       switchMap(({from, to, amount}) =>
-        this.http.get<ConversionResponse>(`${this.BASE_URL}/convert?api_key=${this.API_KEY}&from=${from}&to=${to}&amount=${amount}`)
+        this.currencyService.convert({from, to, amount})
       ),
       tap((response: ConversionResponse) =>
         this.previewCurrencySuccess$.next({result: response.response.value})
@@ -90,9 +75,7 @@ export class CurrencyService {
     this.loadCurrencies$
       .pipe(
         switchMap(() =>
-          this.http.get<{ response: Currency[] }>(
-            `${this.BASE_URL}/currencies?api_key=${this.API_KEY}`
-          )
+          this.currencyService.getCurrencies()
         ),
         tap(({response}) => this.loadCurrenciesSuccess$.next(response)),
         catchError(() => {
@@ -106,14 +89,21 @@ export class CurrencyService {
     this.convertCurrency$
       .pipe(
         debounceTime(300),
-        switchMap(({from, to, amount}) =>
-          this.http
-            .get<ConversionResponse>(
-              `${this.BASE_URL}/convert?api_key=${this.API_KEY}&from=${from}&to=${to}&amount=${amount}`
-            )
+        filter((conversion: Conversion) =>
+          this.distinct(conversion, this.lastConversionMeta())
+        ),
+        switchMap(({from, to, amount, direction}) =>
+          this.currencyService.convert({from, to, amount})
             .pipe(
               tap((response: ConversionResponse) =>
-                this.convertSuccess$.next({result: response.response.value})
+                this.convertSuccess$.next({
+                  result: response.response.value, lastConversion: {
+                    from,
+                    to,
+                    amount,
+                    direction
+                  }
+                })
               ),
               catchError(() => {
                 this.convertError$.next('Failed to convert currency');
@@ -148,19 +138,14 @@ export class CurrencyService {
         converting: true,
         conversionResult: undefined,
         error: undefined,
-        status: 'loading',
-        lastConversion: {
-          from: payload.from,
-          to: payload.to,
-          amount: payload.amount,
-          direction: payload.direction
-        }
+        status: 'loading'
       }))
-      .with(this.convertSuccess$, (state, {result}) => ({
+      .with(this.convertSuccess$, (state, {result, lastConversion}) => ({
         ...state,
         conversionResult: this.toFinanceFormat(result),
         status: 'idle',
-        error: undefined
+        error: undefined,
+        lastConversion
       }))
       .with(this.convertError$, (state, error) => ({
           ...state,
@@ -180,11 +165,12 @@ export class CurrencyService {
     this.loadCurrencies$.next();
   }
 
-  convertCurrency(
-    from: string,
-    to: string,
-    amount: number,
-    direction: ActiveSide
+  convertCurrency({
+                    from,
+                    to,
+                    amount,
+                    direction
+                  }: Conversion
   ): void {
     if (amount > 0 && from && to && from !== to) {
       this.convertCurrency$.next({from, to, amount, direction});
@@ -201,4 +187,9 @@ export class CurrencyService {
   private toFinanceFormat(value: number): number {
     return +(value.toFixed(2));
   }
+
+  private distinct(current: Conversion, last?: Conversion): boolean {
+    return JSON.stringify(current) !== JSON.stringify(last);
+  }
+
 }
