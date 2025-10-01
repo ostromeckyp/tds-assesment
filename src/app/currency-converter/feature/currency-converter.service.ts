@@ -191,5 +191,4 @@ export class CurrencyConverterService {
   private distinct(current: Conversion, last?: Conversion): boolean {
     return JSON.stringify(current) !== JSON.stringify(last);
   }
-
 }
