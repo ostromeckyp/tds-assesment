@@ -1,5 +1,5 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, debounceTime, filter, of, Subject, switchMap, tap } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, map, of, Subject, switchMap, tap } from 'rxjs';
 import { connect } from 'ngxtension/connect';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { CurrencyService } from '../data-access/currency.service';
@@ -31,6 +31,7 @@ export class CurrencyConverterService {
   // selectors
   readonly currencies = computed(() => this.state().currencies);
   readonly loading = computed(() => this.state().status === 'loading');
+  readonly status = computed(() => this.state().status);
   readonly error = computed(() => this.state().error);
   readonly conversionResult = computed(() => this.state().conversionResult);
   readonly lastConversionMeta = computed(() => this.state().lastConversion);
@@ -77,7 +78,9 @@ export class CurrencyConverterService {
         switchMap(() =>
           this.currencyService.getCurrencies()
         ),
-        tap(({response}) => this.loadCurrenciesSuccess$.next(response)),
+        tap(({response}) => {
+          this.loadCurrenciesSuccess$.next(response)
+        }),
         catchError(() => {
           this.loadCurrenciesError$.next('Failed to load currencies');
           return of([]);
@@ -88,29 +91,27 @@ export class CurrencyConverterService {
 
     this.convertCurrency$
       .pipe(
+        distinctUntilChanged((prev, curr) => this.distinct(curr, prev)),
         debounceTime(300),
-        filter((conversion: Conversion) =>
-          this.distinct(conversion, this.lastConversionMeta())
+        switchMap((conversion) => {
+            return this.currencyService.convert({from: conversion.from, to: conversion.to, amount: conversion.amount})
+              .pipe(
+                map((response: ConversionResponse) => ({
+                  lastConversion: conversion,
+                  result: response.response.value
+                }))
+              );
+          }
         ),
-        switchMap(({from, to, amount, direction}) =>
-          this.currencyService.convert({from, to, amount})
-            .pipe(
-              tap((response: ConversionResponse) =>
-                this.convertSuccess$.next({
-                  result: response.response.value, lastConversion: {
-                    from,
-                    to,
-                    amount,
-                    direction
-                  }
-                })
-              ),
-              catchError(() => {
-                this.convertError$.next('Failed to convert currency');
-                return of({response: {amount: 0}} as ConversionResponse);
-              })
-            )
+        tap(({lastConversion, result}) =>
+          this.convertSuccess$.next({
+            result, lastConversion
+          })
         ),
+        catchError(() => {
+          this.convertError$.next('Failed to convert currency');
+          return of({response: {amount: 0}} as ConversionResponse);
+        }),
         takeUntilDestroyed()
       )
       .subscribe();
@@ -122,18 +123,23 @@ export class CurrencyConverterService {
         status: 'loading',
         error: undefined
       }))
-      .with(this.loadCurrenciesSuccess$, (state, currencies) => ({
-        ...state,
-        currencies,
-        status: 'idle',
-        error: undefined
-      }))
+      .with(this.loadCurrenciesSuccess$, (state, currencies) =>
+        ({
+            ...state,
+            currencies,
+            status: 'idle',
+            error: undefined
+          }
+        ))
       .with(this.loadCurrenciesError$, (state, error) => ({
         ...state,
         status: 'error',
         error
       }))
-      .with(this.convertCurrency$, (state, payload) => ({
+      //TODO - to be discussed on demo
+      .with(this.convertCurrency$.pipe(
+        distinctUntilChanged((prev, curr) => this.distinct(curr, prev))
+      ), (state, payload) => ({
         ...state,
         converting: true,
         conversionResult: undefined,
@@ -143,8 +149,8 @@ export class CurrencyConverterService {
       .with(this.convertSuccess$, (state, {result, lastConversion}) => ({
         ...state,
         conversionResult: this.toFinanceFormat(result),
-        status: 'idle',
         error: undefined,
+        status: 'idle',
         lastConversion
       }))
       .with(this.convertError$, (state, error) => ({
@@ -157,6 +163,12 @@ export class CurrencyConverterService {
         ...state,
         status: 'idle',
         previewResult: this.toFinanceFormat(result),
+      })
+    ).with(
+      this.previewCurrencyError$, (state, error) => ({
+        ...state,
+        status: 'error',
+        error
       })
     );
   }
@@ -189,6 +201,6 @@ export class CurrencyConverterService {
   }
 
   private distinct(current: Conversion, last?: Conversion): boolean {
-    return JSON.stringify(current) !== JSON.stringify(last);
+    return JSON.stringify(current) === JSON.stringify(last);
   }
 }
