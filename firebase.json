@@ -7,7 +7,8 @@
       "**/node_modules/**"
     ],
     "rewrites": [
-      { "source": "/api/**", "function": "api" },
+      { "source": "/api/convert", "function": "convert" },
+      { "source": "/api/currencies", "function": "currencies" },
       { "source": "**", "destination": "/index.html" }
     ]
   },
