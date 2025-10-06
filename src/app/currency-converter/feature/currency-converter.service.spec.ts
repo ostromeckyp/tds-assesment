@@ -4,15 +4,28 @@ import { provideZonelessChangeDetection } from '@angular/core';
 import { delay, of, switchMap } from 'rxjs';
 import { CurrencyConverterService } from './currency-converter.service';
 import { ConversionResponse } from '../data-access/currency.model';
+import { RouterTestingHarness } from '@angular/router/testing';
+import { ActivatedRoute } from '@angular/router';
 
 
 describe('CurrencyConverterService', () => {
   let currencyService: CurrencyService;
   let currencyConverterService: CurrencyConverterService;
-  beforeEach(() => {
+  let harness: RouterTestingHarness;
+
+  beforeEach(async () => {
     jest.useFakeTimers();
     TestBed.configureTestingModule({
       providers: [
+        {
+          provide: ActivatedRoute,
+          useValue: {
+            queryParams: of({from: 'EUR', to: 'USD'}),
+            snapshot: {
+              queryParams: {from: 'EUR', to: 'USD'}
+            }
+          }
+        },
         CurrencyConverterService,
         provideZonelessChangeDetection(),
         {
@@ -28,6 +41,7 @@ describe('CurrencyConverterService', () => {
 
     currencyService = TestBed.inject(CurrencyService);
     currencyConverterService = TestBed.inject(CurrencyConverterService);
+    harness = await RouterTestingHarness.create();
   })
 
   test("should be created", () => {

@@ -46,4 +46,7 @@ export type ConversionPayload = {
 };
 
 
+export type ConversionQuery = Pick<ConversionPayload, 'from' | 'to'>;
+
+
 export type Conversion = ConversionPayload & { direction: ActiveSide };

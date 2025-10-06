@@ -1,8 +1,10 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, debounceTime, distinctUntilChanged, EMPTY, map, Subject, switchMap } from 'rxjs';
+import { catchError, debounceTime, distinctUntilChanged, EMPTY, map, Subject, switchMap, tap } from 'rxjs';
 import { connect } from 'ngxtension/connect';
 import { CurrencyService } from '../data-access/currency.service';
-import { Conversion, ConversionResponse, Currency } from '../data-access/currency.model';
+import { Conversion, ConversionQuery, ConversionResponse, Currency } from '../data-access/currency.model';
+import { injectSetQuery } from '../../utils/set-query-params';
+import { injectQueryParams } from 'ngxtension/inject-query-params';
 
 interface CurrencyState {
   currencies: Currency[];
@@ -16,6 +18,9 @@ interface CurrencyState {
 @Injectable()
 export class CurrencyConverterService {
   private readonly currencyService = inject(CurrencyService);
+  // Query
+  readonly queryParam = injectQueryParams<ConversionQuery>();
+  private readonly setQuery = injectSetQuery();
 
   // state
   private readonly state = signal<CurrencyState>({
@@ -80,6 +85,11 @@ export class CurrencyConverterService {
 
     const currencyConverted$ = convertCurrency$
       .pipe(
+        tap(({from, to}) => {
+          this.setQuery.setQueryParams<ConversionQuery>({
+            from, to
+          });
+        }),
         switchMap((conversion) => {
             return this.currencyService.convert({from: conversion.from, to: conversion.to, amount: conversion.amount})
               .pipe(
@@ -137,6 +147,7 @@ export class CurrencyConverterService {
       }))
   }
 
+  // API
   loadCurrencies(): void {
     this.loadCurrencies$.next();
   }

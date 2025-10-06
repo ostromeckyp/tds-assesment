@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, model, signal } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, model, signal, untracked } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
@@ -50,14 +50,17 @@ export class CurrencyConverterComponent {
       }
 
       // default to USD -> EUR for demo purposes
-      const sourceCurr = list.find(c => c.short_code === 'USD');
-      const targetCurr = list.find(c => c.short_code === 'EUR');
+      untracked(() => {
+        const query = this.currencyService.queryParam();
+        const sourceCurr = list.find(c => query?.from ? c.short_code === query.from : c.short_code === 'USD');
+        const targetCurr = list.find(c => query?.to ? c.short_code === query.to : c.short_code === 'EUR');
 
-      if (!sourceCurr || !targetCurr) {
-        return;
-      }
-      this.sourceCurrency.set(sourceCurr);
-      this.targetCurrency.set(targetCurr);
+        if (!sourceCurr || !targetCurr) {
+          return;
+        }
+        this.sourceCurrency.set(sourceCurr);
+        this.targetCurrency.set(targetCurr);
+      })
     });
 
     effect(() => {
