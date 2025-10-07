@@ -139,4 +139,11 @@ export class CurrencyConverterComponent {
       this.activeSide.set('source');
     }
   }
+
+  protected preventInvalidNumberInput(event: KeyboardEvent): void {
+    const invalidKeys = ['e', 'E', '+', '-'];
+    if (invalidKeys.includes(event.key)) {
+      event.preventDefault();
+    }
+  }
 }
