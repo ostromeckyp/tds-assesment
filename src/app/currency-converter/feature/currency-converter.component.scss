@@ -1,0 +1,18 @@
+@use '@angular/material' as mat;
+
+:host {
+  @media (max-width: 768px) {
+    --mat-card-elevated-container-elevation: none;
+  }
+  @include mat.card-overrides((
+    //elevated-container-color: orange,
+    //elevated-container-elevation: red,
+  ));
+}
+
+.footer {
+  display: grid;
+  grid-gap: 1rem;
+  align-items: center;
+  grid-template-columns: minmax(0, 1fr) max-content minmax(0, 1fr);
+}

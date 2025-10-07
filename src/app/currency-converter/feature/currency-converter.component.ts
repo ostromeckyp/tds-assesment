@@ -26,6 +26,7 @@ import { CurrencyConverterService } from './currency-converter.service';
   ],
   providers: [CurrencyConverterService],
   templateUrl: './currency-converter.component.html',
+  styleUrl: './currency-converter.component.scss',
   changeDetection: ChangeDetectionStrategy.OnPush
 })
 export class CurrencyConverterComponent {
@@ -45,7 +46,6 @@ export class CurrencyConverterComponent {
 
     effect(() => {
       const list = this.currencies();
-      console.log('Currencies loaded:', list);
       if (!list.length) {
         return;
       }
@@ -55,8 +55,6 @@ export class CurrencyConverterComponent {
         const query = this.currencyService.queryParam();
         const sourceCurr = list.find(c => query?.from ? c.short_code === query.from : c.short_code === 'USD');
         const targetCurr = list.find(c => query?.to ? c.short_code === query.to : c.short_code === 'EUR');
-
-        console.log('Currencies loaded:', sourceCurr, targetCurr);
 
         if (!sourceCurr || !targetCurr) {
           return;

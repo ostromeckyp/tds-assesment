@@ -3,16 +3,16 @@
 
 @mixin theme() {
   @theme {
-      --font-family: var(--font-family);
-      --color-primary: var(--mat-sys-primary);
-      --color-primary-container: var(--mat-sys-color-primary-container);
-      --color-on-primary: var(--mat-sys-color-on-primary);
-      --color-secondary: var(--mat-sys-secondary);
-      --color-secondary-container: var(--mat-sys-color-secondary-container);
-      --color-on-secondary: var(--mat-sys-color-on-secondary);
-      --color-tertiary: var(--mat-sys-color-tertiary);
-      --color-tertiary-container: var(--mat-sys-color-tertiary-container);
-      --color-on-tertiary: var(--mat-sys-color-on-tertiary);
+    --font-family: var(--font-family);
+    --color-primary: var(--mat-sys-primary);
+    --color-primary-container: var(--mat-sys-color-primary-container);
+    --color-on-primary: var(--mat-sys-color-on-primary);
+    --color-secondary: var(--mat-sys-secondary);
+    --color-secondary-container: var(--mat-sys-color-secondary-container);
+    --color-on-secondary: var(--mat-sys-color-on-secondary);
+    --color-tertiary: var(--mat-sys-color-tertiary);
+    --color-tertiary-container: var(--mat-sys-color-tertiary-container);
+    --color-on-tertiary: var(--mat-sys-color-on-tertiary);
   }
 
   .mdc-notched-outline__notch {
@@ -36,4 +36,5 @@
 
   .animate-shimmer {
     animation: shimmer 1.5s infinite;
-  }}
+  }
+}

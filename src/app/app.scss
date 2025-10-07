@@ -1,0 +1,13 @@
+.content-wrapper {
+  padding: 16px;
+  max-width: 970px;
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  overflow: auto;
+}
+
+.content {
+  min-width: 100%;
+  min-height: 100%;
+}
