@@ -1,4 +1,3 @@
-// src/app/shared/utils/http.util.ts
 export type QueryValue = string | number | boolean | null | undefined;
 
 export type FetchOptions = Omit<RequestInit, 'signal' | 'body'> & {
@@ -23,16 +22,15 @@ export type FetchResult<T> = {
 };
 
 const withQuery = (input: string | URL, query?: Record<string, QueryValue>): URL => {
-  const url = new URL(typeof input === 'string' ? input : input.toString(), 'resolve://');
+  const s = typeof input === 'string' ? input : input.toString();
+  const url = new URL(s);
   if (query) {
     for (const [k, v] of Object.entries(query)) {
       if (v === undefined || v === null) continue;
       url.searchParams.set(k, String(v));
     }
   }
-  // usunięcie sztucznego base `resolve://`
-  const out = new URL(url.pathname + url.search + url.hash, 'http://local');
-  return new URL(out.toString().replace('http://local', ''));
+  return url;
 };
 
 const isJsonResponse = (r: Response): boolean => {
@@ -93,6 +91,7 @@ const coreFetch = async <T = unknown>(input: string, options: FetchOptions = {})
   } = options;
 
   const url = buildUrl(input, baseUrl, query);
+  console.log(`Fetching ${url}`);
   const controller = new AbortController();
   const id = timeoutMs > 0 ? setTimeout(() => controller.abort('timeout'), timeoutMs) : undefined;
 

@@ -1,10 +1,9 @@
-// `functions/src/index.ts`
 import { onRequest } from 'firebase-functions/v2/https';
 import { defineSecret } from 'firebase-functions/params';
 import { http } from './http.util';
+import { Currency } from './api.model';
 
 const CURRENCY_BEACON_API_KEY = defineSecret('CURRENCY_BEACON_API_KEY');
-const url = new URL('https://api.currencybeacon.com/v1/convert');
 
 export const convert = onRequest(
   { cors: true, secrets: [CURRENCY_BEACON_API_KEY] },
@@ -14,21 +13,22 @@ export const convert = onRequest(
       return res.status(400).json({ error: 'Missing parameters: from, to, amount' });
     }
 
+    const url = new URL('https://api.currencybeacon.com/v1/convert');
+
     url.searchParams.set('api_key', CURRENCY_BEACON_API_KEY.value());
     url.searchParams.set('from', from);
     url.searchParams.set('to', to);
     url.searchParams.set('amount', amount);
 
-    const { data, status, error } = await http.get<object>(url.toString());
-
-    if (!data) {
-      return res.status(500).json({ error: 'Invalid response from currency API' });
-    }
+    const { data, status, error } = await http.get<unknown>(url.toString());
 
     if (error) {
-      const message = error?.message || 'Unexpected error';
-      const statusCode = error?.status || 500;
+      const message = error.message || 'Unexpected error';
+      const statusCode = error.status || 500;
       return res.status(statusCode).json({ error: message });
+    }
+    if (!data) {
+      return res.status(500).json({ error: 'Invalid response from currency API' });
     }
     return res.status(status).json(data);
   }
@@ -36,26 +36,31 @@ export const convert = onRequest(
 
 export const currencies = onRequest(
   { cors: true, secrets: [CURRENCY_BEACON_API_KEY] },
-  async (req: any, res: any) => {
+  async (_req: any, res: any) => {
+    const url = new URL('https://api.currencybeacon.com/v1/currencies');
     url.searchParams.set('api_key', CURRENCY_BEACON_API_KEY.value());
 
-    const { data, status, error } = await http.get<Record<number, object>>(url.toString());
+    // logger.log('URL: ', url.toString());
 
+    const { data, status, error } = await http.get<unknown>(url.toString());
+
+    if (error) {
+      const message = error.message || 'Unexpected error';
+      const statusCode = error.status || 500;
+      return res.status(statusCode).json({ error: message });
+    }
     if (!data) {
       return res.status(500).json({ error: 'Invalid response from currency API' });
     }
-    if (error) {
-      const message = error?.message || 'Unexpected error';
-      const statusCode = error?.status || 500;
-      return res.status(statusCode).json({ error: message });
+
+    const resp = (data as any)?.response ?? data;
+    if (!resp) {
+      return res.status(500).json({ error: 'Unexpected payload from currency API' });
     }
 
-    const arr = Object.entries(data).map(([code, v]: [string, any]) => ({
-      code,
-      name: v?.name ?? v?.name_plural ?? v?.label ?? code,
-    }));
-    const body = { response: arr };
+    const arr = Object.entries(resp as Record<string, Currency>)
+      .map(([code, v]) => ({ ...v }));
 
-    return res.status(status).json(body);
+    return res.status(status).json({ response: arr });
   }
 );

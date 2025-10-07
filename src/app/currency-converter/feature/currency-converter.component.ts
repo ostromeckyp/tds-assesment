@@ -1,4 +1,4 @@
-import { ChangeDetectionStrategy, Component, effect, inject, model, signal, untracked } from '@angular/core';
+import { ChangeDetectionStrategy, Component, effect, inject, model, signal, untracked, computed } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
@@ -45,6 +45,7 @@ export class CurrencyConverterComponent {
 
     effect(() => {
       const list = this.currencies();
+      console.log('Currencies loaded:', list);
       if (!list.length) {
         return;
       }
@@ -54,6 +55,8 @@ export class CurrencyConverterComponent {
         const query = this.currencyService.queryParam();
         const sourceCurr = list.find(c => query?.from ? c.short_code === query.from : c.short_code === 'USD');
         const targetCurr = list.find(c => query?.to ? c.short_code === query.to : c.short_code === 'EUR');
+
+        console.log('Currencies loaded:', sourceCurr, targetCurr);
 
         if (!sourceCurr || !targetCurr) {
           return;
@@ -117,5 +120,25 @@ export class CurrencyConverterComponent {
     const numeric = Number(value) || 0;
     this.activeSide.set('target');
     this.targetAmount.set(numeric);
+  }
+
+  protected swapCurrencies(): void {
+    const currentSource = this.sourceCurrency();
+    const currentTarget = this.targetCurrency();
+
+    if (currentSource && currentTarget) {
+      this.sourceCurrency.set(currentTarget);
+      this.targetCurrency.set(currentSource);
+
+      // Swap the amounts as well
+      const currentSourceAmount = this.sourceAmount();
+      const currentTargetAmount = this.targetAmount();
+
+      this.sourceAmount.set(currentTargetAmount || 0);
+      this.targetAmount.set(currentSourceAmount);
+
+      // Set active side to source after swap
+      this.activeSide.set('source');
+    }
   }
 }
