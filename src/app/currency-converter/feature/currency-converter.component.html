@@ -25,23 +25,23 @@
     </mat-form-field>
 
     <div class="footer">
-      <mat-select [(ngModel)]="sourceCurrency">
-        @for (currency of currencies(); track currency) {
-          <mat-option [value]="currency">
+      <select matNativeControl [(ngModel)]="sourceCurrency">
+        @for (currency of currencies(); track currency.short_code) {
+          <option [ngValue]="currency">
             {{ currency.name }}
-          </mat-option>
+          </option>
         }
-      </mat-select>
+      </select>
       <button matIconButton color="primary" (click)="swapCurrencies()">
         <mat-icon>swap_horiz</mat-icon>
       </button>
-      <mat-select [(ngModel)]="targetCurrency">
-        @for (currency of currencies(); track currency) {
-          <mat-option [value]="currency">
+      <select matNativeControl [(ngModel)]="targetCurrency">
+        @for (currency of currencies(); track currency.short_code) {
+          <option [ngValue]="currency">
             {{ currency.name }}
-          </mat-option>
+          </option>
         }
-      </mat-select>
+      </select>
     </div>
   </mat-card-content>
 </mat-card>

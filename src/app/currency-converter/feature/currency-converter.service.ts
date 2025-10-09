@@ -85,10 +85,14 @@ export class CurrencyConverterService {
 
     const currencyConverted$ = convertCurrency$
       .pipe(
-        tap(({from, to}) => {
-          this.setQuery.setQueryParams<ConversionQuery>({
-            from, to
-          });
+        tap(({from, to, direction}) => {
+          const q: ConversionQuery = direction === 'source'
+            ? {from, to}
+            : {from: to, to: from};
+          const current = this.queryParam();
+          if (current?.from !== q.from || current?.to !== q.to) {
+            this.setQuery.setQueryParams<ConversionQuery>(q);
+          }
         }),
         switchMap((conversion) => {
             return this.currencyService.convert({from: conversion.from, to: conversion.to, amount: conversion.amount})
