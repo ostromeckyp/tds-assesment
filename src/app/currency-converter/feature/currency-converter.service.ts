@@ -1,159 +1,141 @@
-import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, debounceTime, distinctUntilChanged, EMPTY, map, Subject, switchMap, tap } from 'rxjs';
-import { connect } from 'ngxtension/connect';
-import { CurrencyService } from '../data-access/currency.service';
+import { computed, effect, inject, Injectable, Injector, signal, untracked } from '@angular/core';
+import { httpResource } from '@angular/common/http';
 import { Conversion, ConversionQuery, ConversionResponse, Currency } from '../data-access/currency.model';
 import { injectSetQuery } from '../../utils/set-query-params';
 import { injectQueryParams } from 'ngxtension/inject-query-params';
-
-interface CurrencyState {
-  currencies: Currency[];
-  status: 'loading' | 'idle' | 'error';
-  error: string | undefined;
-  conversionResult: number | undefined;
-  previewResult: number | undefined;
-  lastConversion: Conversion | undefined;
-}
+import { derivedFrom } from 'ngxtension/derived-from';
+import { debounceTime, distinctUntilChanged, map, pipe } from 'rxjs';
 
 @Injectable()
 export class CurrencyConverterService {
-  private readonly currencyService = inject(CurrencyService);
-  // Query
+  private readonly injector = inject(Injector);
+
+  // Query params
   readonly queryParam = injectQueryParams<ConversionQuery>();
   private readonly setQuery = injectSetQuery();
 
-  // state
-  private readonly state = signal<CurrencyState>({
-    currencies: [],
-    status: 'idle',
-    error: undefined,
-    conversionResult: undefined,
-    previewResult: undefined,
-    lastConversion: undefined
-  });
+  // Sources
+  private readonly convertCurrencyPayload = signal<Conversion | undefined>(undefined);
+  private readonly previewConversionPayload = signal<{ from: string, to: string, amount: number } | undefined>(undefined)
 
-  // selectors
-  readonly currencies = computed(() => this.state().currencies);
-  readonly loading = computed(() => this.state().status === 'loading');
-  readonly status = computed(() => this.state().status);
-  readonly error = computed(() => this.state().error);
-  readonly conversionResult = computed(() => this.state().conversionResult);
-  readonly lastConversionMeta = computed(() => this.state().lastConversion);
-  readonly previewResult = computed(() => this.state().previewResult);
+  // State
+  readonly conversionResult = signal<number | undefined>(undefined);
+  readonly previewResult = signal<number | undefined>(undefined);
+  private readonly lastConversion = signal<Conversion | undefined>(undefined);
 
-  // sources
-  private readonly loadCurrencies$ = new Subject<void>();
-  private previewCurrency$ = new Subject<{
-    from: string;
-    to: string;
-    amount: number;
-  }>();
-  private readonly conversionPayload$ = new Subject<Conversion>();
+  // Derived state
+  private readonly conversionParams = derivedFrom([this.convertCurrencyPayload], pipe(
+    distinctUntilChanged(([prev], [curr]) => this.distinct(curr!, prev)),
+    debounceTime(300),
+    map(([payload]) => {
+      if (!payload) {
+        return undefined;
+      }
+      const amount = payload.amount;
+      const from = payload.from;
+      const to = payload.to;
+      const direction = payload.direction;
+      return {from, to, amount, direction};
+    }),
+  ), {initialValue: this.convertCurrencyPayload()});
 
-  private readonly error$ = new Subject<string>();
+  // private readonly previewParams = computed(() => {
+  //   const from = this.conversionParams()?.from;
+  //   const to = this.conversionParams()?.to;
+  //   return from && to && from !== to ? {from, to, amount: 1} : null;
+  // });
+
+  // Resources
+   private readonly currenciesResource = httpResource<{ response: Currency[] }>(
+    () => '/api/currencies',
+    {
+      defaultValue: {response: []},
+      injector: this.injector
+    }
+  );
+
+  private readonly conversionResource = httpResource<ConversionResponse>(
+    () => {
+      const params = this.conversionParams();
+      return params ? `/api/convert?from=${params.from}&to=${params.to}&amount=${params.amount}` : undefined;
+    },
+    {
+      defaultValue: undefined,
+      injector: this.injector
+    }
+  );
+
+  private readonly previewResource = httpResource<ConversionResponse>(
+    () => {
+      const params = this.previewConversionPayload();
+      return params ? `/api/convert?from=${params.from}&to=${params.to}&amount=${params.amount}` : undefined;
+    },
+    {
+      defaultValue: undefined,
+      injector: this.injector
+    }
+  );
+
+  // Selectors
+  readonly currencies = computed(() => this.currenciesResource.value()?.response ?? []);
+  readonly loading = computed(() => this.currenciesResource.isLoading() || this.conversionResource.isLoading() || this.previewResource.isLoading());
+  readonly error = computed(() => this.currenciesResource.error() || this.conversionResource.error() || this.previewResource.error());
+  readonly lastConversionMeta = computed(() => this.lastConversion());
 
   constructor() {
-    const convertCurrency$ = this.conversionPayload$.pipe(
-      distinctUntilChanged((prev, curr) => this.distinct(curr, prev)),
-      debounceTime(300)
-    );
-    // side effects
-    const currencyPreviewLoaded$ = this.previewCurrency$.pipe(
-      switchMap(({from, to, amount}) =>
-        this.currencyService.convert({from, to, amount}).pipe(
-          map((response: ConversionResponse) =>
-            response.response.value
-          ),
-          catchError(() => {
-            this.error$.next('Failed to convert currency');
-            return EMPTY;
-          }),
-        )
-      ),
-    );
+    effect(() => {
+      const conversionData = this.conversionResource.value();
+      untracked(() => {
+        const lastConversion = this.convertCurrencyPayload();
+        if (conversionData) {
+          this.conversionResult.set(this.toFinanceFormat(conversionData.response.value));
+          this.lastConversion.set(lastConversion);
+        }
+      });
+    });
 
-    const currencyLoaded$ = this.loadCurrencies$
-      .pipe(
-        switchMap(() => this.currencyService.getCurrencies().pipe(
-          map((response) => response.response),
-          catchError(() => {
-            this.error$.next('Failed to load currencies');
-            return EMPTY;
-          })
-        )),
-      )
+    effect(() => {
+      const previewData = this.previewResource.value();
+      if (previewData) {
+        this.previewResult.set(this.toFinanceFormat(previewData.response.value));
+      }
+    });
 
-    const currencyConverted$ = convertCurrency$
-      .pipe(
-        tap(({from, to, direction}) => {
-          const q: ConversionQuery = direction === 'source'
-            ? {from, to}
-            : {from: to, to: from};
-          const current = this.queryParam();
-          if (current?.from !== q.from || current?.to !== q.to) {
-            this.setQuery.setQueryParams<ConversionQuery>(q);
-          }
-        }),
-        switchMap((conversion) => {
-            return this.currencyService.convert({from: conversion.from, to: conversion.to, amount: conversion.amount})
-              .pipe(
-                map((response: ConversionResponse) => ({
-                  lastConversion: conversion,
-                  result: response.response.value
-                })),
-                catchError(() => {
-                  this.error$.next('Failed to convert currency');
-                  return EMPTY;
-                }),
-              );
-          }
-        )
-      );
+    // Effect for query parameter synchronization
+    effect(() => {
+      const from = this.conversionParams()?.from;
+      const to = this.conversionParams()?.to;
+      const direction = this.conversionParams()?.direction;
 
-    // reducers
-    connect(this.state)
-      .with(this.loadCurrencies$, (state) => ({
-        ...state,
-        status: 'loading',
-        error: undefined
-      }))
-      .with(currencyLoaded$, (state, currencies) => ({
-          ...state,
-          currencies,
-          status: 'idle',
-          error: undefined
-        })
-      )
-      .with(convertCurrency$, (state) => ({
-        ...state,
-        conversionResult: undefined,
-        error: undefined,
-        status: 'loading'
-      }))
-      .with(currencyConverted$, (state, payload) => ({
-        ...state,
-        conversionResult: this.toFinanceFormat(payload.result),
-        error: undefined,
-        status: 'idle',
-        lastConversion: payload.lastConversion
-      }))
-      .with(
-        currencyPreviewLoaded$, (state, payload) => ({
-          ...state,
-          status: 'idle',
-          previewResult: this.toFinanceFormat(payload),
-        })
-      )
-      .with(this.error$, (state, error) => ({
-        ...state,
-        status: 'error',
-        error
-      }))
+      if(!from || !to || !direction) {
+        return;
+      }
+
+      untracked(() => {
+        const q: ConversionQuery = direction === 'source'
+          ? {from, to}
+          : {from: to, to: from};
+        const current = this.queryParam();
+        if (current?.from !== q.from || current?.to !== q.to) {
+          this.setQuery.setQueryParams<ConversionQuery>(q);
+        }
+      });
+    });
+
+    // Effect for error logging
+    effect(() => {
+      const error = this.error();
+      if (error) {
+        console.error('Currency converter error:', error);
+      }
+    });
   }
 
   // API
   loadCurrencies(): void {
-    this.loadCurrencies$.next();
+    // Currencies are automatically loaded via httpResource
+    // This method is kept for backward compatibility but does nothing
+    // as the resource handles loading automatically
   }
 
   convertCurrency({
@@ -164,14 +146,19 @@ export class CurrencyConverterService {
                   }: Conversion
   ): void {
     if (amount > 0 && from && to && from !== to) {
-      this.conversionPayload$.next({from, to, amount, direction});
+
+      this.convertCurrencyPayload.set({
+        from,
+        to,
+        amount,
+        direction
+      })
     }
   }
 
   previewConversion(from: string, to: string): void {
-    const amount = 1;
-    if (amount > 0 && from && to && from !== to) {
-      this.previewCurrency$.next({from, to, amount});
+    if (from && to && from !== to) {
+      this.previewConversionPayload.set({from, to, amount: 1});
     }
   }
 
