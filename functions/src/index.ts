@@ -61,6 +61,6 @@ export const currencies = onRequest(
     const arr = Object.entries(resp as Record<string, Currency>)
       .map(([code, v]) => ({ ...v }));
 
-    return res.set('Cache-Control', 'public, max-age=300, s-maxage=86400, stale-while-revalidate=600').status(status).json({ response: arr });
+    return res.set('Cache-Control', 'public, max-age=604800, s-maxage=604800, stale-while-revalidate=86400 stale-if-error=604800').status(status).json({ response: arr });
   }
 );
