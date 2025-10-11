@@ -1,14 +1,15 @@
-import { computed, effect, inject, Injectable, Injector, signal, untracked } from '@angular/core';
-import { httpResource } from '@angular/common/http';
-import { Conversion, ConversionQuery, ConversionResponse, Currency } from '../data-access/currency.model';
+import { computed, effect, inject, Injectable, signal, untracked } from '@angular/core';
+import { Conversion, ConversionPayload, ConversionQuery } from '../data-access/currency.model';
 import { injectSetQuery } from '../../utils/set-query-params';
 import { injectQueryParams } from 'ngxtension/inject-query-params';
 import { derivedFrom } from 'ngxtension/derived-from';
 import { debounceTime, distinctUntilChanged, map, pipe } from 'rxjs';
+import { CurrencyService } from '../data-access/currency.service';
+import { rxResource } from '@angular/core/rxjs-interop';
 
 @Injectable()
 export class CurrencyConverterService {
-  private readonly injector = inject(Injector);
+  private readonly currencyService = inject(CurrencyService);
 
   // Query params
   readonly queryParam = injectQueryParams<ConversionQuery>();
@@ -16,7 +17,11 @@ export class CurrencyConverterService {
 
   // Sources
   private readonly convertCurrencyPayload = signal<Conversion | undefined>(undefined);
-  private readonly previewConversionPayload = signal<{ from: string, to: string, amount: number } | undefined>(undefined)
+  private readonly previewConversionPayload = signal<{
+    from: string,
+    to: string,
+    amount: number
+  } | undefined>(undefined)
 
   // State
   readonly conversionResult = signal<number | undefined>(undefined);
@@ -39,42 +44,42 @@ export class CurrencyConverterService {
     }),
   ), {initialValue: this.convertCurrencyPayload()});
 
-  // private readonly previewParams = computed(() => {
-  //   const from = this.conversionParams()?.from;
-  //   const to = this.conversionParams()?.to;
-  //   return from && to && from !== to ? {from, to, amount: 1} : null;
-  // });
 
   // Resources
-   private readonly currenciesResource = httpResource<{ response: Currency[] }>(
-    () => '/api/currencies',
-    {
-      defaultValue: {response: []},
-      injector: this.injector
+  private readonly currenciesResource = rxResource({
+    stream: () => this.currencyService.getCurrencies(),
+  });
+
+  private readonly conversionResource = rxResource({
+      params: () => {
+        const params = this.conversionParams();
+        if (!params) {
+          return undefined;
+        }
+        return {
+          from: params.from,
+          to: params.to,
+          amount: params.amount
+        }
+      },
+      stream: ({params}) => this.currencyService.convert(params as ConversionPayload)
     }
   );
 
-  private readonly conversionResource = httpResource<ConversionResponse>(
-    () => {
-      const params = this.conversionParams();
-      return params ? `/api/convert?from=${params.from}&to=${params.to}&amount=${params.amount}` : undefined;
+  private readonly previewResource = rxResource({
+    params: () => {
+      const payload = this.previewConversionPayload();
+      if (!payload) {
+        return undefined;
+      }
+      return {
+        from: payload.from,
+        to: payload.to,
+        amount: 1
+      }
     },
-    {
-      defaultValue: undefined,
-      injector: this.injector
-    }
-  );
-
-  private readonly previewResource = httpResource<ConversionResponse>(
-    () => {
-      const params = this.previewConversionPayload();
-      return params ? `/api/convert?from=${params.from}&to=${params.to}&amount=${params.amount}` : undefined;
-    },
-    {
-      defaultValue: undefined,
-      injector: this.injector
-    }
-  );
+    stream: ({params}) => this.currencyService.convert(params as ConversionPayload)
+  });
 
   // Selectors
   readonly currencies = computed(() => this.currenciesResource.value()?.response ?? []);
@@ -107,7 +112,7 @@ export class CurrencyConverterService {
       const to = this.conversionParams()?.to;
       const direction = this.conversionParams()?.direction;
 
-      if(!from || !to || !direction) {
+      if (!from || !to || !direction) {
         return;
       }
 
@@ -131,12 +136,6 @@ export class CurrencyConverterService {
     });
   }
 
-  // API
-  loadCurrencies(): void {
-    // Currencies are automatically loaded via httpResource
-    // This method is kept for backward compatibility but does nothing
-    // as the resource handles loading automatically
-  }
 
   convertCurrency({
                     from,

@@ -68,8 +68,6 @@ export class CurrencyConverterComponent {
   }));
 
   constructor() {
-    this.currencyService.loadCurrencies();
-
     effect(() => {
       const sourceCurrency = this.sourceCurrency();
       const targetCurrency = this.targetCurrency();
