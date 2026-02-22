@@ -10,9 +10,9 @@ import { injectQueryParams } from 'ngxtension/inject-query-params';
 interface CurrencyState {
   currencies: Currency[];
   status: 'loading' | 'idle' | 'error';
-  error: string | undefined;
-  conversionResult: number | undefined;
-  previewResult: number | undefined;
+  error: string;
+  conversionResult: number;
+  previewResult: number;
   lastConversion: Conversion | undefined;
 }
 
@@ -30,13 +30,13 @@ export class CurrencyConverterService {
   private readonly state = signal<CurrencyState>({
     currencies: this.storedCurrencies() ?? [],
     status: 'idle',
-    error: undefined,
-    conversionResult: undefined,
-    previewResult: undefined,
+    error: '',
+    conversionResult: 0,
+    previewResult: 0,
     lastConversion: undefined
   });
 
-  // selectors
+  // selectors (derived state)
   readonly currencies = computed(() => this.state().currencies);
   readonly loading = computed(() => this.state().status === 'loading');
   readonly status = computed(() => this.state().status);
@@ -79,7 +79,7 @@ export class CurrencyConverterService {
     const currencyLoaded$ = this.loadCurrencies$
       .pipe(
         switchMap(() => {
-          if(this.storedCurrencies()?.length) {
+          if (this.storedCurrencies()?.length) {
             console.log('currencies loaded from local storage');
             return of(this.storedCurrencies());
           }
