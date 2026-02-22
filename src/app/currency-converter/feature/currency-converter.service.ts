@@ -1,5 +1,6 @@
 import { computed, inject, Injectable, signal } from '@angular/core';
-import { catchError, debounceTime, distinctUntilChanged, EMPTY, map, Subject, switchMap, tap } from 'rxjs';
+import { injectLocalStorage } from 'ngxtension/inject-local-storage';
+import { catchError, debounceTime, distinctUntilChanged, EMPTY, map, of, Subject, switchMap, tap } from 'rxjs';
 import { connect } from 'ngxtension/connect';
 import { CurrencyService } from '../data-access/currency.service';
 import { Conversion, ConversionQuery, ConversionResponse, Currency } from '../data-access/currency.model';
@@ -22,9 +23,12 @@ export class CurrencyConverterService {
   readonly queryParam = injectQueryParams<ConversionQuery>();
   private readonly setQuery = injectSetQuery();
 
+  // local storage
+  private readonly storedCurrencies = injectLocalStorage<Currency[]>('currencies', {storageSync: true});
+
   // state
   private readonly state = signal<CurrencyState>({
-    currencies: [],
+    currencies: this.storedCurrencies() ?? [],
     status: 'idle',
     error: undefined,
     conversionResult: undefined,
@@ -74,13 +78,22 @@ export class CurrencyConverterService {
 
     const currencyLoaded$ = this.loadCurrencies$
       .pipe(
-        switchMap(() => this.currencyService.getCurrencies().pipe(
-          map((response) => response.response),
-          catchError(() => {
-            this.error$.next('Failed to load currencies');
-            return EMPTY;
-          })
-        )),
+        switchMap(() => {
+          if(this.storedCurrencies()?.length) {
+            console.log('currencies loaded from local storage');
+            return of(this.storedCurrencies());
+          }
+          return this.currencyService.getCurrencies().pipe(
+            map((response) => response.response),
+            tap((currencies) => {
+              this.storedCurrencies.set(currencies);
+            }),
+            catchError(() => {
+              this.error$.next('Failed to load currencies');
+              return EMPTY;
+            })
+          )
+        }),
       )
 
     const currencyConverted$ = convertCurrency$
@@ -117,12 +130,14 @@ export class CurrencyConverterService {
         status: 'loading',
         error: undefined
       }))
-      .with(currencyLoaded$, (state, currencies) => ({
-          ...state,
-          currencies,
-          status: 'idle',
-          error: undefined
-        })
+      .with(currencyLoaded$, (state, currencies) => {
+          return {
+            ...state,
+            currencies,
+            status: 'idle',
+            error: undefined
+          };
+        }
       )
       .with(convertCurrency$, (state) => ({
         ...state,
