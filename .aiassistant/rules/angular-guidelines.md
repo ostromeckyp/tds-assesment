@@ -1,4 +1,6 @@
-
+---
+apply: always
+---
 
 <big style="margin-top: 2em">
 Angular is a web framework that empowers developers to build fast, reliable applications.

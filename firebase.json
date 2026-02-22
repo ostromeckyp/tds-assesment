@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "public": "dist/tds-assesment/browser",
+    "public": "dist/currency-converter/browser",
     "ignore": [
       "firebase.json",
       "**/.*",
