@@ -28,7 +28,7 @@ export class CurrencyConverterService {
   readonly previewResult = signal<number | undefined>(undefined);
   private readonly lastConversion = signal<Conversion | undefined>(undefined);
 
-  // Derived state
+  // Derived from to debounce - HELPER
   private readonly conversionParams = derivedFrom([this.convertCurrencyPayload], pipe(
     distinctUntilChanged(([prev], [curr]) => this.distinct(curr!, prev)),
     debounceTime(300),
