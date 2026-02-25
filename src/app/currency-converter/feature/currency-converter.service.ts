@@ -88,6 +88,7 @@ export class CurrencyConverterService {
   readonly lastConversionMeta = computed(() => this.lastConversion());
 
   constructor() {
+    // Effect for currency conversion
     effect(() => {
       const conversionData = this.conversionResource.value();
       untracked(() => {
@@ -99,6 +100,7 @@ export class CurrencyConverterService {
       });
     });
 
+    // Effect for preview conversion
     effect(() => {
       const previewData = this.previewResource.value();
       if (previewData) {
