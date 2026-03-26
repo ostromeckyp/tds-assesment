@@ -24,9 +24,28 @@ export class CurrencyConverterService {
   } | undefined>(undefined)
 
   // State
-  readonly conversionResult = signal<number | undefined>(undefined);
-  readonly previewResult = signal<number | undefined>(undefined);
-  private readonly lastConversion = signal<Conversion | undefined>(undefined);
+  readonly conversionResult = computed(() => {
+    const conversionData = this.conversionResource.value();
+    if (conversionData) {
+      return this.toFinanceFormat(conversionData.response.value);
+    }
+    return undefined
+  });
+  readonly previewResult = computed(() => {
+    const previewData = this.previewResource.value();
+    if (previewData) {
+      return this.toFinanceFormat(previewData.response.value);
+    }
+    return undefined;
+  });
+  private readonly lastConversion = computed(() => {
+    const conversionData = this.conversionResource.value();
+    const lastConversion = this.convertCurrencyPayload();
+    if (conversionData) {
+      return lastConversion;
+    }
+    return undefined;
+  });
 
   // Derived from to debounce - HELPER
   private readonly conversionParams = derivedFrom([this.convertCurrencyPayload], pipe(
@@ -88,26 +107,6 @@ export class CurrencyConverterService {
   readonly lastConversionMeta = computed(() => this.lastConversion());
 
   constructor() {
-    // Effect for currency conversion
-    effect(() => {
-      const conversionData = this.conversionResource.value();
-      untracked(() => {
-        const lastConversion = this.convertCurrencyPayload();
-        if (conversionData) {
-          this.conversionResult.set(this.toFinanceFormat(conversionData.response.value));
-          this.lastConversion.set(lastConversion);
-        }
-      });
-    });
-
-    // Effect for preview conversion
-    effect(() => {
-      const previewData = this.previewResource.value();
-      if (previewData) {
-        this.previewResult.set(this.toFinanceFormat(previewData.response.value));
-      }
-    });
-
     // Effect for query parameter synchronization
     effect(() => {
       const from = this.conversionParams()?.from;
